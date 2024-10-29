@@ -1,3 +1,5 @@
+import { genHandlers } from "./events";
+
 export class CodegenState {
     options;
     constructor(options){
@@ -37,13 +39,28 @@ function genChildren(el){
     }
 }
 
+export function genData(el){
+    let data = "{"
+
+    if (el.events) {
+        // genHandlers 生成的内容为 {on:{click:function($event){msg = '你好世界'}}} 
+        data += `${genHandlers(el.events, false)},`
+    }
+    // 去除最后的逗号并拼接 }
+    data = data.replace(/,$/, '') + '}'
+    return data;
+}
+
 function genElement(el){
     //最终返回的字符串
     let code;
     let tag = `'${el.tag}'`; 
+    let data = genData(el);
     let children = genChildren(el);
 
     code = `_c(${tag}${
+        data ? `,${data}`:''
+    }${
         children ? `,${children}`:''
     })` 
     return code;

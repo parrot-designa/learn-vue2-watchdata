@@ -27,9 +27,9 @@ export function parseHTML(html,options){
             } 
 
             // 解析开始标签
-            const startTagMatch = parseStartTag()
-            if(startTagMatch){  
-                options.start(startTagMatch);
+            const startTagMatch = parseStartTag() 
+            if(startTagMatch){
+                handleStartTag(startTagMatch);
                 continue
             }
         }
@@ -82,5 +82,28 @@ export function parseHTML(html,options){
     }
 
     function parseEndTag(tagName) {
+    }
+
+    function handleStartTag(match){
+        const tagName = match.tagName;
+        const l = match.attrs.length;
+        const attrs = new Array(l)
+        for(let i = 0; i < l; i++){
+            const args = match.attrs[i];
+            // args[0] 是匹配到的属性字符串 @click="msg = '你好世界'"
+            // args[1] 是属性名 ，包括前面的修饰符以及方括号内的内容和属性名本身 @click
+            // args[2] 如果存在等号= 则会被捕获 但这通常是一个布尔值，表示是否有等号 =
+            // args[3] 如果属性值被双引号包围，则这部分内容将被捕获 msg = '你好世界'
+            // args[4] undefined
+            // args[5] undefined
+            const value = args[3] || args[4] || args[5] || ""; 
+            attrs[i] = {
+                name:args[1],
+                value
+            }
+        }
+        if (options.start) {
+            options.start({tagName, attrs})
+        }
     }
 }

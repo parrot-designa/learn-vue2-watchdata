@@ -1,6 +1,9 @@
 
 import { parseHTML } from "./html-parser";
 import { parseText } from "./text-parser";
+import { addHandler } from "../helpers";
+export const dirRE = /^v-|^@|^:|^#/
+export const onRE = /^@|^v-on:/
 
 export function createASTElement(
     tag,
@@ -9,7 +12,7 @@ export function createASTElement(
     return {
         type:1,
         tag,
-        attrList:attrs, 
+        attrsList:attrs, 
         children:[]
     }
 }
@@ -18,6 +21,10 @@ export function parse(template){
 
     let rootAst;
     const stack = [];
+
+    function closeElement(element){
+        processElement(element);
+    }
     
     parseHTML(template,{
         start:(startMatch)=>{
@@ -42,7 +49,9 @@ export function parse(template){
                     let currentParent = stack[stack.length-1];
                     currentParent.children = currentParent.children || [];
                     currentParent.children.push(currentElement);
+                    // 关闭元素时调用 
                 } 
+                closeElement(currentElement)
             }
         },
         chars:(text)=>{
@@ -69,4 +78,28 @@ export function parse(template){
         },
     });  
     return rootAst;
+}
+
+export function processElement(element){
+    processAttrs(element)
+}
+
+function processAttrs(el){
+    const list = el.attrsList
+    let i, name,value, l;
+    for (i = 0, l = list.length; i < l; i++) {
+        name = list[i].name;
+        value = list[i].value
+        // 如果匹配到 v-on、@、v-bind、:
+        if(dirRE.test(name)){
+            // 说明绑定了一些动态属性
+            el.hasBindings = true;
+            // 如果是事件
+            if(onRE.test(name)){
+                // 删除事件相关的修饰符 只剩下名字
+                name = name.replace(onRE, '');
+                addHandler(el, name, value);
+            }
+        }
+    }
 }

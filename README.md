@@ -224,4 +224,136 @@ export function proxy(target, sourceKey, key) {
 
 此时页面已经成功渲染出来了 msg变量的内容。
 
-# 五、编译器部分增加 methods 解析
+# 五、编译器部分增加事件解析
+
+等一下我们会演示数据可变的功能。
+
+所以我们需要通过事件进行触发。
+
+由于我们没有添加事件相关的逻辑，所以我们需要进行添加。
+
+得益于 vue强大的模版编译，你可以将事件定义在模板中，或者定义在方法中。
+
+之前我们解析动态属性`(@/v-on)`时，使用正则表达式进行匹配，但是我们将解析过后的属性直接返回，match正则匹配对象是一个数组，会非常的难看。所以我们可以进行适当的调整。
+
+参照源码我们使用一个函数来处理属性。
+
+```js
+    function handleStartTag(match){
+        const tagName = match.tagName;
+        const l = match.attrs.length;
+        const attrs = new Array(l)
+        for(let i = 0; i < l; i++){
+            const args = match.attrs[i];
+            // args[0] 是匹配到的属性字符串 @click="msg = '你好世界'"
+            // args[1] 是属性名 ，包括前面的修饰符以及方括号内的内容和属性名本身 @click
+            // args[2] 如果存在等号= 则会被捕获 但这通常是一个布尔值，表示是否有等号 =
+            // args[3] 如果属性值被双引号包围，则这部分内容将被捕获 msg = '你好世界'
+            // args[4] undefined
+            // args[5] undefined
+            const value = args[3] || args[4] || args[5] || ""; 
+            attrs[i] = {
+                name:args[1],
+                value
+            }
+        }
+        if (options.start) {
+            options.start({tagName, attrs})
+        }
+    }
+```
+
+处理为一个以属性名为 key，属性值为属性内容的对象。
+
+# 六、补充创建 AST时 事件相关的属性
+
+对于类似事件、指令等，ast上有特别的属性，比如如果一个节点上存在事件。
+
+则会在这个节点的 ast上新增一个hasBindings属性和一个 events属性。
+
+对于这部分逻辑，在 vue中是在关闭节点时触发的。
+
+```js
+end:()=>{
+    // 关闭元素时调用
+    closeElement(element)
+}
+
+function closeElement(element){
+    processElement(element);
+}
+
+export function processElement(element){
+    processAttrs(element)
+}
+
+// 处理属性
+function processAttrs(el){
+    const list = el.attrsList
+    let i, name,value, l;
+    for (i = 0, l = list.length; i < l; i++) {
+        name = list[i].name;
+        value = list[i].value
+        // 如果匹配到 v-on、@、v-bind、:
+        if(dirRE.test(name)){
+            // 说明绑定了一些动态属性
+            el.hasBindings = true;
+            // 如果是事件
+            if(onRE.test(name)){
+                // 删除事件相关的修饰符 只剩下名字
+                name = name.replace(onRE, '');
+                addHandler(el, name, value);
+            }
+        }
+    }
+}
+```
+
+判断如果属性中存在绑定动态属性，如`@、v-on、:、v-bind`，则设置一个 `hasBindings`属性。
+
+然后绑定一个`events`属性。
+
+# 7、生成render函数时，在模版中增加对应属性
+
+事件都存放在 data属性中：
+
+```js
+export function genData(el){
+    let data = "{"
+
+    if (el.events) {
+        // genHandlers 生成的内容为 {on:{click:function($event){msg = '你好世界'}}} 
+        data += `${genHandlers(el.events, false)},`
+    }
+    // 去除最后的逗号并拼接 }
+    data = data.replace(/,$/, '') + '}'
+    return data;
+}
+
+export function genHandlers(
+    events
+){
+    const prefix = 'on:';
+    let staticHandlers = ``
+    for(const name in events){
+        const handlerCode = genHandler(events[name]);
+        staticHandlers += `"${name}":${handlerCode},`
+    }
+    // 加上括号+去除逗号
+    staticHandlers = `{${staticHandlers.slice(0, -1)}}`
+    return prefix + staticHandlers;
+}
+
+function genHandler(
+    handler
+){
+    if(!handler){
+        return 'function(){}'
+    } 
+    const handlerCode = handler.value;
+    return `function($event){${handlerCode}}`
+}
+```
+
+
+

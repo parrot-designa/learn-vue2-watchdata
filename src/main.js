@@ -12,7 +12,7 @@ import Vue from "@/my-vue2/platforms/web/entry-runtime-with-compiler-esm";
 
 // const { render } = compileToFunctions(`<div><span>我是爱吃水果的人</span></div>`)
 
-// const vm = Vue();
+// const vm = Vue
 
 // Vue.config.optionMergeStrategies.test1 = (parent,child)=>{
 //     console.log("第一个参数："+parent);
@@ -26,7 +26,7 @@ import Test from "./Test.vue"
 // const vm = new Vue(Test).$mount("#app"); 
 
 const vm = new Vue({ 
-    template:`<div>{{ msg }}</div>`,
+    template:`<div @click="msg = '你好世界'">{{ msg }}</div>`,
     data:{
         msg:'Hello World'
     }
