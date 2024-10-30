@@ -2,6 +2,7 @@
 import { warn,mark } from "../util";
 import { createEmptyVNode } from "../vdom/vnode";
 import config from "../config";
+import Watcher from "../observer/watcher";
 
 export function initLifeCycle(vm) {}
 
@@ -46,12 +47,16 @@ export function mountComponent(vm,el){
             measure(`vue ${name} patch`, startTag, endTag)
         }
     }else{
-        updateComponent = () => {
+        updateComponent = (vm) => {
             vm._update(vm._render())
         }
     }
 
-    updateComponent()
+    new Watcher(
+        vm,
+        updateComponent
+    )
+ 
     return vm;
 }
 

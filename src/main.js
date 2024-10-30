@@ -26,7 +26,7 @@ import Test from "./Test.vue"
 // const vm = new Vue(Test).$mount("#app"); 
 
 const vm = new Vue({ 
-    template:`<div @click="msg = '你好世界'">{{ msg }}</div>`,
+    template:`<div @click="console.log('测试');msg = '你好世界'">{{ msg }}</div>`,
     data:{
         msg:'Hello World'
     }

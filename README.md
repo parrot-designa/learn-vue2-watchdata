@@ -269,7 +269,7 @@ export function proxy(target, sourceKey, key) {
 
 对于类似事件、指令等，ast上有特别的属性，比如如果一个节点上存在事件。
 
-则会在这个节点的 ast上新增一个hasBindings属性和一个 events属性。
+则会在这个节点的 ast上新增一个`hasBindings`属性和一个 `events`属性。
 
 对于这部分逻辑，在 vue中是在关闭节点时触发的。
 
@@ -313,7 +313,7 @@ function processAttrs(el){
 
 然后绑定一个`events`属性。
 
-# 7、生成render函数时，在模版中增加对应属性
+# 七、生成render函数时，在模版中增加对应属性
 
 事件都存放在 data属性中：
 
@@ -355,5 +355,211 @@ function genHandler(
 }
 ```
 
+所以对于模板`<div @click="msg = '你好世界'">{{ msg }}</div>`来说。
+
+首先会转为ast：
+```js
+{
+    tag:'div',
+    type:1,
+    children:[
+        {type:2,expression:"_s(msg)",text:"{{ msg }}"}
+    ],
+    events:{
+        click:{value:"msg = '你好世界'"}
+    },
+    hasBindings:true,
+    attrsList:[
+        { name:'@click', value:"msg = '你好世界'"}
+    ]
+}
+```
+
+再转化为render函数：
+
+```js
+(function anonymous(
+) {
+with(this){return _c('div',{on:{"click":function($event){msg = '你好世界'}}},[_v(_s(msg))])}
+})
+```
+
+# 八、如何监听click事件
+
+那么vue是何时对节点进行事件监听的呢？
+
+我们知道只有在进行渲染时才会调用`_render`，只有在`_render`时节点渲染到页面上才存在节点。
+
+只有存在节点才能进行事件监听。
+
+在 `createPatchFunctions函数`内部初始时，会给 cbs添加不同执行 hook需要调用的参数。
+
+其中事件监听就在这个时候执行。
+
+```js
+import platformModules from "@/my-vue2/platforms/web/runtime/modules/index";
+
+const modules = platformModules;
+
+export const patch = createPatchFunction({ nodeOps, modules })
+
+// platforms/web/runtime/modules/index.js
+import events from "./events";
+
+export default [events];
+
+// platforms/web/runtime/modules/events.js
+// 更新 dom 监听
+function updateDOMListeners(oldVnode, vnode){
+    // 如果没有on 说明无需进行事件监听 直接返回 不进行处理
+    if (isUndef(oldVnode.data.on) && isUndef(vnode.data.on)) {
+        return
+    }
+    const on = vnode.data.on || {};
+    const oldOn = oldVnode.data.on || {};
+    // 真实DOM
+    target = vnode.elm || oldVnode.elm;
+    updateListeners(on,oldOn,add,remove)
+    target = undefined;
+}
 
 
+export default {
+    create: updateDOMListeners
+}
+
+
+// core/vdom/helpers/update-listeners.js
+import { cached, isUndef, warn } from "../../util";
+
+const normalizeEvent = cached(
+    (name)=>{
+        return {
+            name
+        }
+    }
+)
+
+export function updateListeners(
+    on,
+    oldOn,
+    add,
+    remove
+){
+    let name,cur,event;
+    for(name in on){
+        // 获取具体的事件函数
+        cur = on[name]
+        // 事件
+        event = normalizeEvent(name);
+        if(isUndef(cur)){
+            __DEV__ &&
+            warn(`无效的${event.name}事件处理函数`)
+        }else {
+            add(event.name, cur, event.capture, event.passive)
+        }
+    }
+}
+
+// 不同的执行时机
+const hooks = ['create', 'activate', 'update', 'remove', 'destroy']
+
+function createPatchFunction({modules}){
+    const cbs = {};
+    for(i = 0; i < hooks.length; ++i){
+        cbs[hooks[i]] = []
+        for (j = 0; j < modules.length; ++j) {
+            if (isDef(modules[j][hooks[i]])) {
+                cbs[hooks[i]].push(modules[j][hooks[i]])
+            }
+        }
+    }
+}
+```
+
+在创建完节点以后进行事件监听。
+
+```js
+// 调用 create 钩子
+function invokeCreateHooks(vnode){
+    for (let i = 0; i < cbs.create.length; ++i) {
+        cbs.create[i](emptyNode, vnode)
+    }
+} 
+
+if (isDef(data)) {
+    invokeCreateHooks(vnode)
+}
+```
+
+# 九、初始化时设置监听
+
+```js
+// 初始化 data 时对 data进行监听
+export function initData(vm){
+    // 监听整个data数据
+    observe(data)
+}
+
+// 为 value 创建一个观察者实例
+export function observe(
+    value
+){
+    if(isPlainObject(value)){
+        return new Observer(value);
+    }
+}
+
+// 观察者类
+export class Observer{
+    constructor(value){
+        if(isArray(value)){
+
+        }else{
+            const keys = Object.keys(value);
+            for(let i = 0;i < keys.length;i++){
+                const key = keys[i]
+                // 对 data里面的每一项做处理
+                defineReactive(value, key, NO_INITIAL_VALUE, undefined)
+            }
+        }
+    }
+}
+// 给每个属性单独设置 get 和 setter
+export function defineReactive(
+    obj,
+    key,
+    val
+){
+    const dep = new Dep();
+
+    // 获取属性描述符
+    const property = Object.getOwnPropertyDescriptor(obj, key);
+    // 如果不可配置 直接返回 不进行处理
+    if (property && property.configurable === false) {
+        return
+    }
+    // get描述符
+    const getter = property && property.get
+    // set描述符
+    const setter = property && property.set
+    
+    val = obj[key];
+
+    Object.defineProperty(obj, key, {
+        // 可枚举
+        enumerable: true,
+        // 可配置
+        configurable: true,
+        get:function reactiveGetter(){
+            const value = getter ? getter.call(obj) : val;
+            if(Dep.target){
+                
+            }
+            return value;
+        }
+    });
+
+    return dep;
+}
+```

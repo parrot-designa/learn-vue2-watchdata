@@ -1,4 +1,5 @@
 import { isFunction, isPlainObject,warn,isReserved,noop } from "../util";
+import { observe } from "../observer";
 
 export function getData(data, vm){
     try{
@@ -46,6 +47,8 @@ function initData(vm){
             proxy(vm, `_data`, key)
         }
     }
+    // 跟踪的是 data对象
+    const ob = observe(data)
 }
 
 
