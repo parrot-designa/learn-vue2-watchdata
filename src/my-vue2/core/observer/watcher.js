@@ -1,11 +1,13 @@
 import { isFunction } from "../util";
 import { pushTarget,popTarget } from "./dep";
+import { queueWatcher } from "./scheduler";
 
 // 每一个实例 也就是每一个组件 都存在一个 watcher 实例
 export default class Watcher {
 
     getter;
-    vm
+    vm;
+    active;
 
     constructor(
         vm, 
@@ -36,5 +38,14 @@ export default class Watcher {
 
     addDep(dep){
         const id = dep.id;
+        dep.addSub(this);
+    }
+
+    update(){
+        queueWatcher(this);
+    }
+
+    run(){
+        const value = this.get()
     }
 }

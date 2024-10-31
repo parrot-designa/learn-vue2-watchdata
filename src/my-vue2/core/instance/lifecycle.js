@@ -61,8 +61,17 @@ export function mountComponent(vm,el){
 }
 
 export function lifecycleMixin(Vue){
-    Vue.prototype._update = function(vnode){
+    Vue.prototype._update = function(vnode){ 
         const vm = this;
-        vm.__patch__(vm.$el,vnode);
+        const prevVnode = vm._vnode
+        // 初次渲染过后，_vnode存储的是当前渲染的 vnode
+        vm._vnode = vnode
+        // 没有说明 是vm上没有_vnode 即为初次渲染
+        if(!prevVnode){
+            vm.__patch__(vm.$el,vnode);
+        }else{
+            vm.__patch__(prevVnode,vnode);
+        }
+        
     }
 }

@@ -563,3 +563,49 @@ export function defineReactive(
     return dep;
 }
 ```
+
+每一个 data 中的属性都关联了在一个 Dep对象。
+
+```js
+data(){
+    return {
+        msg: 'Hello World'
+    }
+}
+```
+
+1. 数据转换：
+
+当创建一个 Vue 实例时，Vue 会对传入的数据对象进行递归遍历，将其属性转换为 getter/setter 形式的访问器属性。这样，当访问或修改这些属性时，会触发相应的 getter 和 setter。
+
+2. 依赖收集：
+
+当渲染函数（render function）或者计算属性（computed property）被首次执行时，Vue 会创建一个 Watcher 实例，并开始收集依赖。
+在这个过程中，当访问一个响应式属性时，属性对应的依赖（Dep）会记录当前的 Watcher。
+
+3. 依赖存储
+
+每个响应式属性都有一个 Dep 实例，Dep 实例维护了一个订阅者列表（subscribers list），也就是 Watcher 实例列表。当访问一个响应式属性时，Dep 实例会将当前的 Watcher 添加到它的订阅者列表中。
+
+4. 数据变更
+
+当响应式数据发生变化时，setter 会触发，并通知 Dep 实例更新其所有的订阅者（Watcher）。
+
+5. 视图更新
+
+当数据发生变化时，Dep 实例会调用 Watcher 的更新方法。Watcher 会重新计算其表达式，并触发相应的更新，从而更新视图。
+
+```js
+Vue.prototype._update = function(vnode){ 
+        const vm = this;
+        const prevVnode = vm._vnode
+        // 初次渲染过后，_vnode存储的是当前渲染的 vnode
+        vm._vnode = vnode
+        // 没有说明 是vm上没有_vnode 即为初次渲染
+        if(!prevVnode){
+            vm.__patch__(vm.$el,vnode);
+        }else{
+            vm.__patch__(prevVnode,vnode);
+        }
+}
+```
